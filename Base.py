@@ -4,6 +4,7 @@ import time
 from openpyxl import load_workbook
 from Functions import *
 from LineModels import *
+from TransformerModels import *
 from DG import *
 from LoadModels import *
 
@@ -82,9 +83,6 @@ tolerance = settings[0][1]
 maxIterations = settings[1][1]
 roundFactor = settings[2][1]
 
-#print ('Bases : ', bases)
-#print ('Initial Voltage : ', calculatedVoltages)
-
 # Comparison
 calculatedVoltagesOfPreviousIteration = []
 
@@ -153,11 +151,6 @@ while (iteration <= maxIterations and converged == False):
             calculatedCurrents.remove(totalNodeCurrent)
             calculatedCurrents.append([nodeId, numpy.add(totalNodeCurrent[1],nodeCurrent)])
 
-    #print (calculatedCurrents)
-
-    # Clear Voltages Array
-    calculatedVoltages = []
-
     # Backward Sweep
     for i in range(lastNode,0, -1):
         connectedNodes = getConnectedNodes_BS(edges, i)
@@ -166,7 +159,7 @@ while (iteration <= maxIterations and converged == False):
         # SIGN => (Node ID, Current Matrix)
         current = searchArray(calculatedCurrents,i)
         if current == 0:
-            totalCurrentAtNode = [i,numpy.array([[complex(0,0)],[complex(0,0)],[complex(0,0)]])]
+            totalCurrentAtNode = [numpy.array([[complex(0,0)],[complex(0,0)],[complex(0,0)]])]
         else:
             totalCurrentAtNode = current[1]
 
@@ -177,7 +170,15 @@ while (iteration <= maxIterations and converged == False):
                 totalCurrentAtNode = numpy.add(totalCurrentAtNode, connectedNodeTotalCurrent[1])
             else:
                 # Do TF Convert
-                print ('TF')
+                # SIGN => (Rating, Primary Voltage, Secondary Voltage, Z, XR, TF Type)
+                tfParameters = connectedNode[4].split(",")
+                connectedNodeTotalCurrent = searchArray(calculatedTotalCurrentsAtNode,connectedNode[2])
+                voltage = searchArray(calculatedVoltages, i)[1]
+                if (tfParameters[5] == 'YD'):
+                    convertedCurrentAtThisNode = backwardTfYgD(voltage, connectedNodeTotalCurrent[1], float(tfParameters[3])/100)
+                else:
+                    convertedCurrentAtThisNode = 0
+                totalCurrentAtNode = numpy.add(totalCurrentAtNode, convertedCurrentAtThisNode)
             
         calculatedTotalCurrentsAtNode.append([i, totalCurrentAtNode])
 
@@ -185,7 +186,10 @@ while (iteration <= maxIterations and converged == False):
 
         if destinationNode != 0 and destinationNode[3] == 'L':
             calculatedEdgeCurrents.append([destinationNode[0], totalCurrentAtNode, i])
-
+    
+    # Clear Voltages Array
+    calculatedVoltages = []
+    
     # Forward Sweep
     for i in range(1, lastNode + 1, 1):
         edgeData = getPreviousNode_FS(edges, i)
@@ -205,7 +209,21 @@ while (iteration <= maxIterations and converged == False):
                 edgeParameters = edgeData[1].split(",")
                 newVoltage = approximateLineModel(previousNodeVoltage[1], edgeCurrent[1] , complex(edgeParameters[0])/z_base, complex(edgeParameters[1])/z_base)
             else:
-                print ('TF')
+                # SIGN => (Node ID, Voltage Matrix)
+                previousNodeVoltage = searchArray(calculatedVoltages,edgeData[0])
+
+                nodeTotalCurrent = searchArray(calculatedTotalCurrentsAtNode,i)
+
+                nodePreviousIterationVoltage = searchArray(calculatedVoltagesOfPreviousIteration,i)
+                if nodePreviousIterationVoltage == 0:
+                    nodePreviousIterationVoltage = nodeThreePhaseVoltagePU
+                else:
+                    nodePreviousIterationVoltage = nodePreviousIterationVoltage[1]
+
+                tfParameters = edgeData[4].split(",")
+
+                newVoltage = fowardTfYgD(previousNodeVoltage[1], nodePreviousIterationVoltage, nodeTotalCurrent[1], float(tfParameters[3])/100)
+
 
         calculatedVoltages.append([i, newVoltage])
         #print(i, printMatrixPolar ((newVoltage * 400)))
@@ -218,8 +236,10 @@ while (iteration <= maxIterations and converged == False):
         printVoltage = searchArray(calculatedVoltages,row-1)[1]
         base = searchArray(bases, row-1)
         polarVoltages = []
+        puVoltages = []
         for complexPUVoltage in printVoltage:
             polarVoltages.append(convertToPolar(complexPUVoltage[0] * base[1], roundFactor))
+            puVoltages.append(str(complexPUVoltage[0]))
         print (", ".join(polarVoltages))
         sweepOutputSheet.cell(column=iteration + 1, row=row, value=str(", ".join(polarVoltages)))
 
