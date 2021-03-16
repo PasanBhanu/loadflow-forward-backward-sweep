@@ -18,7 +18,7 @@ converged = False
 startTime = time.time()
 
 # Load data from excel sheet
-wb = load_workbook(filename = 'data.xlsx')
+wb = load_workbook(filename = 'dat.xlsx')
 edgesSheet = wb['edges']
 nodesSheet = wb['nodes']
 voltagesSheet = wb['voltages']
@@ -28,7 +28,15 @@ sweepOutputSheet = wb['fbsweep']
 # Add data to arrays
 edges = []
 for value in edgesSheet.iter_rows(min_row=2,min_col=1,max_col=5,values_only=True):
-    edges.append(value)
+    # Calculate Line Impedances
+    if value[3] == "L":
+        epm = value[4].split(",")
+        # SIGN => (resistance_p, gmr_p, resistance_n, gmr_n, phases, length, isNeutralAvailable, frequency, soilResistivity, type, l_12, l_13, l_23, l_1n, l_2n, l_3n)
+        lineParameters = calculateLineResistance(float(epm[0]),float(epm[1]),float(epm[2]),float(epm[3]),int(epm[4]),float(epm[5]),bool(epm[6]),float(epm[7]),float(epm[8]),epm[9],float(epm[10]),float(epm[11]),float(epm[12]),float(epm[13]),float(epm[14]),float(epm[15]))
+        line = (value[0], lineParameters, value[2], value[3])
+        edges.append(line)
+    else:
+        edges.append(value)
 
 nodes = []
 for value in nodesSheet.iter_rows(min_row=2,min_col=1,max_col=4,values_only=True):
@@ -243,7 +251,7 @@ while (iteration <= maxIterations and converged == False):
         print (", ".join(polarVoltages))
         sweepOutputSheet.cell(column=iteration + 1, row=row, value=str(", ".join(polarVoltages)))
 
-    wb.save('data.xlsx')
+    wb.save('dat.xlsx')
 
     # Check Error
     if iteration > 1:
