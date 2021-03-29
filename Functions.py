@@ -36,9 +36,18 @@ def printMatrixPolar(matrix):
     table = [fmt.format(*row) for row in s]
     return '\n'.join(table)
 
+# Convert cartisan to polar
 def convertToPolar(value, roundFactor):
     polarStr = str(round(abs(value),roundFactor)) + ' ∠ ' + str(round(numpy.degrees(cmath.phase(value)),roundFactor))
     return polarStr
+
+def getPolarMagnitude(value, roundFactor):
+    polarMagnitude = round(abs(value),roundFactor)
+    return polarMagnitude
+
+# Convert polar to cartisan form (Value, Angle in Degrees)
+def convertToCartisan(value, angle):
+    return complex(value * numpy.cos(angle),value * numpy.sin(angle))
 
 # ---- Backward Sweep ---- #
 

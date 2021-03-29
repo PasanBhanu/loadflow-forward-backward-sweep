@@ -24,6 +24,7 @@ nodesSheet = wb['nodes']
 voltagesSheet = wb['voltages']
 settingsSheet = wb['settings']
 sweepOutputSheet = wb['fbsweep']
+outputSheet = wb['finaldata']
 
 # Add data to arrays
 edges = []
@@ -56,10 +57,14 @@ lastNode = maxValueFromExcelColumns(edges, 2)
 
 # Clean Workbook
 wb.remove(sweepOutputSheet)
+wb.remove(outputSheet)
 sweepOutputSheet = wb.create_sheet('fbsweep')
-sweepOutputSheet['A1'] = 'Nodes'
+outputSheet = wb.create_sheet('finaldata')
+sweepOutputSheet['A1'] = 'Node'
+outputSheet['A1'] = 'Node'
 for row in range(2,lastNode + 2):
     sweepOutputSheet.cell(column=1, row=row, value=row-1)
+    outputSheet.cell(column=1, row=row, value=row-1)
 
 # Calculate Bases
 bases = []
@@ -67,7 +72,9 @@ bases = []
 calculatedVoltages = []
 
 rating = searchArray(voltages, 1)[2]
-voltage = complex(searchArray(voltages, 1)[1])
+# Get polar value and converted to cartesian
+tmpPolarVoltage = searchArray(voltages, 1)[1]
+voltage = convertToCartisan(float(tmpPolarVoltage.split(",")[0]), float(tmpPolarVoltage.split(",")[1]))
 
 def calculateBase(startNode, voltage, rating):
     connectedNodes = getConnectedNodes_BS(edges, startNode)
@@ -90,6 +97,8 @@ iteration = 1
 tolerance = settings[0][1]
 maxIterations = settings[1][1]
 roundFactor = settings[2][1]
+upperLimitViolation = settings[3][1]
+lowerLimitViolation = settings[4][1]
 
 # Comparison
 calculatedVoltagesOfPreviousIteration = []
@@ -97,7 +106,7 @@ calculatedVoltagesOfPreviousIteration = []
 ### LOOP ###
 
 while (iteration <= maxIterations and converged == False):
-    print ('Iteration ', iteration)
+    #print ('Iteration ', iteration)
 
     # Variables for Sweep
     calculatedCurrents = []
@@ -237,6 +246,8 @@ while (iteration <= maxIterations and converged == False):
         #print(i, printMatrixPolar ((newVoltage * 400)))
 
     #print (calculatedVoltages)
+    lowerViolationArray = []
+    upperViolationArray = []
 
     ## Add data to excel
     sweepOutputSheet.cell(column=iteration + 1, row=1, value='Sweep ' + str(iteration))
@@ -245,10 +256,36 @@ while (iteration <= maxIterations and converged == False):
         base = searchArray(bases, row-1)
         polarVoltages = []
         puVoltages = []
+        
+        # Limit Checking
+        isUpperViolated = isLowerViolated = False
+        allowedUpperLimit = base[1] * upperLimitViolation
+        allowedLowerLimit = base[1] * lowerLimitViolation
+        
         for complexPUVoltage in printVoltage:
+            basePolar = getPolarMagnitude(base[1],roundFactor)
+            voltagePolar = getPolarMagnitude(complexPUVoltage[0] * base[1],roundFactor)
+            # print(basePolar,voltagePolar)
+            
+            if (basePolar - voltagePolar) > 0:
+                # Lower Limit
+                if (basePolar - voltagePolar) >= lowerLimitViolation:
+                    isLowerViolated = True
+            else:
+                # Upper Limit
+                if (voltagePolar - basePolar) >= upperLimitViolation:
+                    isUpperViolated = True
+                
             polarVoltages.append(convertToPolar(complexPUVoltage[0] * base[1], roundFactor))
             puVoltages.append(str(complexPUVoltage[0]))
-        print (", ".join(polarVoltages))
+
+        # Print Violations
+        if isLowerViolated:
+            lowerViolationArray.append((row-1, polarVoltages)) 
+
+        if isUpperViolated:
+            upperViolationArray.append((row-1, polarVoltages)) 
+
         sweepOutputSheet.cell(column=iteration + 1, row=row, value=str(", ".join(polarVoltages)))
 
     wb.save('dat.xlsx')
@@ -269,8 +306,24 @@ while (iteration <= maxIterations and converged == False):
 
         if totalMaximumError <= tolerance:
             print ('Converged')
+            # Output final results
             converged = True
 
+    if iteration >= maxIterations or converged:
+        print ('Upper Limit : ' + str(upperLimitViolation) + '%')
+        print (' ')
+        print ('Bus\tPhase A\t\t\tPhase B\t\t\tPhase C\t\t\t')
+        for bus in upperViolationArray:
+            print (str(bus[0]) + '\t' + "\t\t".join(bus[1]))
+        print (' ')
+        print (' ')
+        print ('Lower Limit : ' + str(lowerLimitViolation) + '%')
+        print (' ')
+        print ('Bus\tPhase A\t\t\tPhase B\t\t\tPhase C\t\t\t')
+        for bus in lowerViolationArray:
+            print (str(bus[0]) + '\t' + "\t\t".join(bus[1]))
+        print (' ')
+        
     # Next iteration
     iteration = iteration + 1
     calculatedVoltagesOfPreviousIteration = calculatedVoltages
