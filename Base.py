@@ -194,6 +194,8 @@ while (iteration <= maxIterations and converged == False):
                 angle = (2 * math.pi * float(tfParameters[6])) / 360
                 connectedNodeTotalCurrent = searchArray(calculatedTotalCurrentsAtNode,connectedNode[2])
                 voltage = searchArray(calculatedVoltages, i)[1]
+
+                # Select respective function based on TF type
                 if (tfParameters[5] == 'YD'):
                     convertedCurrentAtThisNode = backwardTfYgD(voltage, connectedNodeTotalCurrent[1], float(tfParameters[3])/100, angle)
                 elif (tfParameters[5] == 'YY'):
@@ -246,8 +248,10 @@ while (iteration <= maxIterations and converged == False):
                     nodePreviousIterationVoltage = nodePreviousIterationVoltage[1]
 
                 tfParameters = edgeData[4].split(",")
+                angle = (2 * math.pi * float(tfParameters[6])) / 360
 
-                newVoltage = fowardTfYgD(previousNodeVoltage[1], nodePreviousIterationVoltage, nodeTotalCurrent[1], float(tfParameters[3])/100)
+                # Select respective function based on TF type
+                newVoltage = fowardTfYgD(previousNodeVoltage[1], nodePreviousIterationVoltage, nodeTotalCurrent[1], float(tfParameters[3])/100, angle)
 
 
         calculatedVoltages.append([i, newVoltage])
