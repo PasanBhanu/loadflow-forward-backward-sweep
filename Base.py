@@ -76,21 +76,29 @@ rating = searchArray(voltages, 1)[2]
 tmpPolarVoltage = searchArray(voltages, 1)[1]
 voltage = convertToCartisan(float(tmpPolarVoltage.split(",")[0]), float(tmpPolarVoltage.split(",")[1]))
 
-def calculateBase(startNode, voltage, rating):
+def calculateBase(startNode, voltage, rating, connection):
     connectedNodes = getConnectedNodes_BS(edges, startNode)
     for connectedNode in connectedNodes:
         if connectedNode[3] == 'T':
             transformerData = searchDoubleArray(edges, startNode, connectedNode[2])[4].split(",")
             rating = float(transformerData[0])
             voltage = complex(transformerData[2])
+            if transformerData[5] == 'YD':
+                connection = 'D'
+            else:
+                connection = 'S'
+        else:
+            if connection == 'S':
+                voltage = voltage * math.sqrt(3)
         bases.append([connectedNode[2], voltage, rating])
-        calculateBase(connectedNode[2], voltage, rating)
+        calculateBase(connectedNode[2], voltage, rating, connection)
         # Set Voltage for Each Node
         calculatedVoltages.append([connectedNode[2], nodeThreePhaseVoltagePU])
 
 bases.append([1, voltage, rating])
 calculatedVoltages.append([1, nodeThreePhaseVoltagePU])
-calculateBase(1, voltage, rating)
+# Calculate base assuming initial connection is Star (Need developments)
+calculateBase(1, voltage, rating, 'S')
 
 # Network iteration
 iteration = 1
@@ -106,7 +114,6 @@ calculatedVoltagesOfPreviousIteration = []
 ### LOOP ###
 
 while (iteration <= maxIterations and converged == False):
-    #print ('Iteration ', iteration)
 
     # Variables for Sweep
     calculatedCurrents = []
@@ -120,8 +127,6 @@ while (iteration <= maxIterations and converged == False):
         nodeConnection = node[1]
         nodeType = node[2]
         voltage = searchArray(calculatedVoltages, nodeId)[1]
-        
-        #print ('Node Voltage : ', printMatrix(voltage))
         
         nodeCurrent = numpy.array([[complex(0,0)],[complex(0,0)],[complex(0,0)]])
         if nodeType == 'L':
@@ -152,13 +157,10 @@ while (iteration <= maxIterations and converged == False):
             loadParameters = node[3].split(",")
             base = searchArray(bases, nodeId)
             pu_Power = numpy.array([[complex(loadParameters[0])/base[2]],[complex(loadParameters[1])/base[2]],[complex(loadParameters[2])/base[2]]])
-            powerFactor = numpy.array([[float(loadParameters[3])],[float(loadParameters[4])],[float(loadParameters[5])]])
             if nodeConnection == 'S':
-                nodeCurrent = generatorStar(voltage, pu_Power, powerFactor)
+                nodeCurrent = generatorStar(voltage, pu_Power)
             else:
-                nodeCurrent = generatorStarDelta(voltage, pu_Power, powerFactor)
-
-        #print (nodeId, printMatrixPolar(nodeCurrent * 21.65))
+                nodeCurrent = generatorStarDelta(voltage, pu_Power)
         
         # Add Total Nodal Current to Array
         totalNodeCurrent = searchArray(calculatedCurrents, nodeId)
@@ -176,7 +178,7 @@ while (iteration <= maxIterations and converged == False):
         # SIGN => (Node ID, Current Matrix)
         current = searchArray(calculatedCurrents,i)
         if current == 0:
-            totalCurrentAtNode = [numpy.array([[complex(0,0)],[complex(0,0)],[complex(0,0)]])]
+            totalCurrentAtNode = numpy.array([[complex(0,0)],[complex(0,0)],[complex(0,0)]])
         else:
             totalCurrentAtNode = current[1]
 
@@ -187,22 +189,28 @@ while (iteration <= maxIterations and converged == False):
                 totalCurrentAtNode = numpy.add(totalCurrentAtNode, connectedNodeTotalCurrent[1])
             else:
                 # Do TF Convert
-                # SIGN => (Rating, Primary Voltage, Secondary Voltage, Z, XR, TF Type)
+                # SIGN => (Rating, Primary Voltage, Secondary Voltage, Z, XR, TF Type, Angle)
                 tfParameters = connectedNode[4].split(",")
+                angle = (2 * math.pi * float(tfParameters[6])) / 360
                 connectedNodeTotalCurrent = searchArray(calculatedTotalCurrentsAtNode,connectedNode[2])
                 voltage = searchArray(calculatedVoltages, i)[1]
                 if (tfParameters[5] == 'YD'):
-                    convertedCurrentAtThisNode = backwardTfYgD(voltage, connectedNodeTotalCurrent[1], float(tfParameters[3])/100)
+                    convertedCurrentAtThisNode = backwardTfYgD(voltage, connectedNodeTotalCurrent[1], float(tfParameters[3])/100, angle)
+                elif (tfParameters[5] == 'YY'):
+                    connectedNodeTotalCurrent = searchArray(calculatedTotalCurrentsAtNode,connectedNode[2])
+                    convertedCurrentAtThisNode = numpy.add(totalCurrentAtNode, connectedNodeTotalCurrent[1])
                 else:
                     convertedCurrentAtThisNode = 0
                 totalCurrentAtNode = numpy.add(totalCurrentAtNode, convertedCurrentAtThisNode)
             
         calculatedTotalCurrentsAtNode.append([i, totalCurrentAtNode])
 
-        # print(i, printMatrixPolar ((totalCurrentAtNode * 21.7)))
-
         if destinationNode != 0 and destinationNode[3] == 'L':
             calculatedEdgeCurrents.append([destinationNode[0], totalCurrentAtNode, i])
+        elif destinationNode != 0 and destinationNode[3] == 'T':
+            tfParameters = destinationNode[4].split(",")
+            if tfParameters[5] == 'YY':
+                calculatedEdgeCurrents.append([destinationNode[0], totalCurrentAtNode, i])
     
     # Clear Voltages Array
     calculatedVoltages = []
@@ -243,9 +251,11 @@ while (iteration <= maxIterations and converged == False):
 
 
         calculatedVoltages.append([i, newVoltage])
-        #print(i, printMatrixPolar ((newVoltage * 400)))
 
-    #print (calculatedVoltages)
+
+    # Output results variables
+    outputPolarStr = ''
+    outputPUStr = ''
     lowerViolationArray = []
     upperViolationArray = []
 
@@ -256,26 +266,27 @@ while (iteration <= maxIterations and converged == False):
         base = searchArray(bases, row-1)
         polarVoltages = []
         puVoltages = []
-        
-        # Limit Checking
+
+        # Limit Checking Variables
         isUpperViolated = isLowerViolated = False
         allowedUpperLimit = base[1] * upperLimitViolation
         allowedLowerLimit = base[1] * lowerLimitViolation
-        
+
         for complexPUVoltage in printVoltage:
+            # Limit Check Calculations
             basePolar = getPolarMagnitude(base[1],roundFactor)
             voltagePolar = getPolarMagnitude(complexPUVoltage[0] * base[1],roundFactor)
-            # print(basePolar,voltagePolar)
             
             if (basePolar - voltagePolar) > 0:
                 # Lower Limit
-                if (basePolar - voltagePolar) >= lowerLimitViolation:
+                if (basePolar - voltagePolar) >= allowedLowerLimit:
                     isLowerViolated = True
             else:
                 # Upper Limit
-                if (voltagePolar - basePolar) >= upperLimitViolation:
+                if (voltagePolar - basePolar) >= allowedUpperLimit:
                     isUpperViolated = True
-                
+
+
             polarVoltages.append(convertToPolar(complexPUVoltage[0] * base[1], roundFactor))
             puVoltages.append(str(complexPUVoltage[0]))
 
@@ -285,10 +296,12 @@ while (iteration <= maxIterations and converged == False):
 
         if isUpperViolated:
             upperViolationArray.append((row-1, polarVoltages)) 
+        
+        outputPolarStr += '\n' + str(row-1) + '\t' + "\t\t".join(polarVoltages)
 
         sweepOutputSheet.cell(column=iteration + 1, row=row, value=str(", ".join(polarVoltages)))
 
-    wb.save('dat.xlsx')
+    wb.save(filename = 'dat.xlsx')
 
     # Check Error
     if iteration > 1:
@@ -305,16 +318,36 @@ while (iteration <= maxIterations and converged == False):
                 totalMaximumError = maximumError
 
         if totalMaximumError <= tolerance:
-            print ('Converged')
-            # Output final results
             converged = True
 
+
+    ### CONSOLE PRINT ###
+
+    # Max Iteration Print
+    if iteration >= maxIterations:
+        print ('Iteration limit reached without convergence')
+        print (' ')
+
+    if converged:
+        print ('Converged after ' + str(iteration) + ' iterations')
+        print (' ')
+
     if iteration >= maxIterations or converged:
+        print ('Bus Voltages')
+        print (' ')
+        print ('Bus\tPhase A\t\t\tPhase B\t\t\tPhase C\t\t\t')
+        print (outputPolarStr)
+        print (' ')
+        print (' ')
+        print ('----- VIOLATIONS -----')
+        print (' ')
         print ('Upper Limit : ' + str(upperLimitViolation) + '%')
         print (' ')
         print ('Bus\tPhase A\t\t\tPhase B\t\t\tPhase C\t\t\t')
         for bus in upperViolationArray:
             print (str(bus[0]) + '\t' + "\t\t".join(bus[1]))
+        if len(upperViolationArray) == 0:
+            print('\t\t\t*** No Violations ***')
         print (' ')
         print (' ')
         print ('Lower Limit : ' + str(lowerLimitViolation) + '%')
@@ -322,6 +355,8 @@ while (iteration <= maxIterations and converged == False):
         print ('Bus\tPhase A\t\t\tPhase B\t\t\tPhase C\t\t\t')
         for bus in lowerViolationArray:
             print (str(bus[0]) + '\t' + "\t\t".join(bus[1]))
+        if len(lowerViolationArray) == 0:
+            print('\t\t\t*** No Violations ***')
         print (' ')
         
     # Next iteration

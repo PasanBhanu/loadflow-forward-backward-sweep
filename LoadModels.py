@@ -22,9 +22,12 @@ def loadCurrentDelta(voltage, power, cpq, cc, ci):
     Iz = numpy.nan_to_num(Iz)
     Im = cc * numpy.conjugate(numpy.divide(power,voltage))
     total = numpy.add(Ipq, numpy.add(Iz,Im))
+    return total
+
+    # Transformation Matrix is not required since we do the calculation either on LN or LL.
     
-    tfMatrix = numpy.array([[1,0,-1],[-1,1,0],[0,-1,1]])
-    return numpy.dot(tfMatrix, total)
+    # tfMatrix = numpy.array([[1,0,-1],[-1,1,0],[0,-1,1]])
+    # return numpy.dot(tfMatrix, total)
 
 # Line Current of Star Shunt Capacitance - Voltage (LN)
 def shuntCapacitanceStar(voltage, kV, kVar, z_base):
@@ -40,6 +43,9 @@ def shuntCapacitanceDelta(voltage, kV, kVar, z_base):
     Z = numpy.nan_to_num(Z)
     Z_pu = numpy.divide(Z, z_base)
     I = numpy.divide(voltage, Z_pu)
+    return I
 
-    tfMatrix = numpy.array([[1,0,-1],[-1,1,0],[0,-1,1]])
-    return numpy.dot(tfMatrix, I)
+    # Transformation Matrix is not required since we do the calculation either on LN or LL.
+    
+    # tfMatrix = numpy.array([[1,0,-1],[-1,1,0],[0,-1,1]])
+    # return numpy.dot(tfMatrix, I)

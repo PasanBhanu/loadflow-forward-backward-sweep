@@ -1,6 +1,7 @@
 import cmath
 import numpy
 
+# Get maximum value from excel column
 def maxValueFromExcelColumns(rows, column):
     maxValue = 0
     for row in rows:
@@ -22,6 +23,8 @@ def searchDoubleArray(arr, start, end):
             return row
     return 0
 
+# ---- Printing / Output ---- #
+
 def printMatrix(matrix):
     s = [[str(e) for e in row] for row in matrix]
     lens = [max(map(len, col)) for col in zip(*s)]
@@ -36,18 +39,21 @@ def printMatrixPolar(matrix):
     table = [fmt.format(*row) for row in s]
     return '\n'.join(table)
 
+# ---- Value Conversions ---- #
+
 # Convert cartisan to polar
 def convertToPolar(value, roundFactor):
-    polarStr = str(round(abs(value),roundFactor)) + ' ∠ ' + str(round(numpy.degrees(cmath.phase(value)),roundFactor))
+    polarStr = str(round(abs(value),roundFactor)) + ' ' + str(round(numpy.degrees(cmath.phase(value)),roundFactor))
     return polarStr
 
+# Get magnitude of polar
 def getPolarMagnitude(value, roundFactor):
     polarMagnitude = round(abs(value),roundFactor)
     return polarMagnitude
 
 # Convert polar to cartisan form (Value, Angle in Degrees)
 def convertToCartisan(value, angle):
-    return complex(value * numpy.cos(angle),value * numpy.sin(angle))
+    return complex(value * numpy.cos(angle), value * numpy.sin(angle))
 
 # ---- Backward Sweep ---- #
 
@@ -79,7 +85,7 @@ def getConnectedNodes_BS(arr, node):
             connectedNodes.append(row)
     return connectedNodes
 
-
+# Get total current at each node
 def getCalculatedTotalCurrentsAtNode(arr, node):
     for row in arr:
         if (row[0] == node):

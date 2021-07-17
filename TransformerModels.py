@@ -3,14 +3,14 @@ import cmath
 import math
 
 # Calculate Primary Currents of YgD Transformer - Backward Sweep (Is & Impedance of T/F)
-def backwardTfYgD(Vp, Is, Z):
-    a = complex(-0.5, math.sqrt(3)/2)
-    a_2 = complex(-0.5, -1 * math.sqrt(3)/2)
+def backwardTfYgD(Vp, Is, Z, angle):
+    a = complex(math.cos((2*math.pi)/3), math.sin((2*math.pi)/3))
+    a_2 = a * a
     A = numpy.array([[1,1,1],[1,a_2,a],[1,a,a_2]])
     # Find sequence components (A_inv . Is)
     Is_sequential = numpy.dot(numpy.linalg.inv(A),Is)
     # Apply phase shift
-    Is_sequential = Is_sequential * complex(math.sqrt(3)/2,0.5)
+    Is_sequential = Is_sequential * complex(math.cos(angle), math.sin(angle))
     # Set zero sequnce current to 0
     Is_sequential[0] = 0
     # Calculate sequence primary voltages
@@ -24,9 +24,9 @@ def backwardTfYgD(Vp, Is, Z):
     return Ip
 
 # Calculate Secondary Voltages of YgD Transformer - Foward Sweep (
-def fowardTfYgD(Vp, Vs, Is, Z):
-    a = complex(-0.5, math.sqrt(3)/2)
-    a_2 = complex(-0.5, -1 * math.sqrt(3)/2)
+def fowardTfYgD(Vp, Vs, Is, Z, angle):
+    a = complex(math.cos((2*math.pi)/3), math.sin((2*math.pi)/3))
+    a_2 = a * a
     A = numpy.array([[1,1,1],[1,a_2,a],[1,a,a_2]])
     # Find sequence components (A_inv . Is)
     Is_sequential = numpy.dot(numpy.linalg.inv(A),Is)
@@ -38,22 +38,22 @@ def fowardTfYgD(Vp, Vs, Is, Z):
     # Calculate Vs_sequential
     Vs_sequential = Vp_sequential - numpy.dot([[0,0,0],[0,Z,0],[0,0,Z]], Is_sequential) + numpy.array([Vs_sequential[0],[0],[0]])
     # Apply phase shift
-    Vs_sequential = Vs_sequential * complex(math.sqrt(3)/2,0.5)
+    Vs_sequential = Vs_sequential * complex(math.cos(angle), math.sin(angle))
     Vs = numpy.dot(A, Vs_sequential)
 
     return Vs
 
 # Calculate Primary Currents of DGy Transformer - Backward Sweep (Is & Impedance of T/F)
-def backwardTfDYg(Is):
-    a = complex(-0.5, math.sqrt(3)/2)
-    a_2 = complex(-0.5, -1 * math.sqrt(3)/2)
+def backwardTfDYg(Is, angle):
+    a = complex(math.cos((2*math.pi)/3), math.sin((2*math.pi)/3))
+    a_2 = a * a
     A = numpy.array([[1,1,1],[1,a_2,a],[1,a,a_2]])
     # Find sequence components (A_inv . Is)
     Is_sequential = numpy.dot(numpy.linalg.inv(A),Is)
     # Save Is_sequential(0) = Is( 
     Is_sequential_0 = Is_sequential[0]
     # Apply phase shift
-    Is_sequential = Is_sequential * complex(math.sqrt(3)/2,0.5)
+    Is_sequential = Is_sequential * complex(math.cos(angle), math.sin(angle))
     # Set zero sequnce current to 0
     Is_sequential[0] = 0
     # Calculate primary current
@@ -63,9 +63,9 @@ def backwardTfDYg(Is):
     return Ip
 
 # Calculate Secondary Voltages of YgD Transformer - Foward Sweep (
-def fowardTfDYg(Vp, Vs, Is, Z):
-    a = complex(-0.5, math.sqrt(3)/2)
-    a_2 = complex(-0.5, -1 * math.sqrt(3)/2)
+def fowardTfDYg(Vp, Vs, Is, Z, angle):
+    a = complex(math.cos((2*math.pi)/3), math.sin((2*math.pi)/3))
+    a_2 = a * a
     A = numpy.array([[1,1,1],[1,a_2,a],[1,a,a_2]])
     # Find sequence components (A_inv . Is)
     Is_sequential = numpy.dot(numpy.linalg.inv(A),Is)
@@ -77,7 +77,7 @@ def fowardTfDYg(Vp, Vs, Is, Z):
     # Calculate Vs_sequential
     Vs_sequential = Vp_sequential - numpy.dot([[0,0,0],[0,Z,0],[0,0,Z]], Is_sequential) - numpy.array([Is[0] * Z,[0],[0]])
     # Apply phase shift
-    Vs_sequential = Vs_sequential * complex(math.sqrt(3)/2,0.5)
+    Vs_sequential = Vs_sequential * complex(math.cos(angle), math.sin(angle))
     Vs = numpy.dot(A, Vs_sequential)
 
     return Vs
