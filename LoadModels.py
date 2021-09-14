@@ -1,9 +1,5 @@
 import numpy
 
-#from Functions import *
-#print (printMatrixPolar(total * 138.88))
-#print (printMatrix(z * 51.84))
-
 # Line Current of Star Connected Load - Voltage (LN)
 def loadCurrentStar(voltage, power, cpq, cc, ci):
     Ipq = cpq * numpy.conjugate(numpy.divide(power,voltage))

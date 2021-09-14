@@ -11,6 +11,7 @@ def approximateLineModel(voltage, current, zero_impedance, positive_impedance):
     V = voltage - (1/3) * numpy.dot(Z_approx,current)
     return V
 
+# ToDo: Length of the line is not considered. Add it to calculations
 def calculateLineResistance(resistance_p, gmr_p, resistance_n, gmr_n, phases, length, isNeutralAvailable, frequency, soilResistivity, type, l_12, l_13, l_23, l_1n, l_2n, l_3n):
     r_11 = r_22 = r_33 = r_12 = r_13 = r_23 = r_1n = r_2n = r_3n = complex(0,0)
 
