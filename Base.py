@@ -97,7 +97,7 @@ def calculateBase(startNode, voltage, rating, connection):
 
 bases.append([1, voltage, rating])
 calculatedVoltages.append([1, nodeThreePhaseVoltagePU])
-# Calculate base assuming initial connection is Star (Need developments)
+# Calculate base assuming initial connection is Star (ToDo: Add support to get initial connection type)
 calculateBase(1, voltage, rating, 'S')
 
 # Network iteration
@@ -196,6 +196,7 @@ while (iteration <= maxIterations and converged == False):
                 voltage = searchArray(calculatedVoltages, i)[1]
 
                 # Select respective function based on TF type
+                # ToDo: Add support for more transformer types
                 if (tfParameters[5] == 'YD'):
                     convertedCurrentAtThisNode = backwardTfYgD(voltage, connectedNodeTotalCurrent[1], float(tfParameters[3])/100, angle)
                 elif (tfParameters[5] == 'YY'):
@@ -211,6 +212,7 @@ while (iteration <= maxIterations and converged == False):
             calculatedEdgeCurrents.append([destinationNode[0], totalCurrentAtNode, i])
         elif destinationNode != 0 and destinationNode[3] == 'T':
             tfParameters = destinationNode[4].split(",")
+            # ToDo: Add support for other transformer types
             if tfParameters[5] == 'YY':
                 calculatedEdgeCurrents.append([destinationNode[0], totalCurrentAtNode, i])
     
